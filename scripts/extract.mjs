@@ -36,6 +36,7 @@ function weaponAction(item) {
 		damage: num(s.damage?.value),
 		type: DTYPES.includes(s.damageType?.value) ? s.damageType.value : 'physical',
 		defense: s.defense === 'mdef' ? 'mdef' : 'def',
+		hr: s.rollInfo?.useWeapon?.hrZero?.value ? false : undefined,
 		targets: 1,
 	};
 }
@@ -45,7 +46,7 @@ function spellAction(item) {
 	const cost = parseAmount(s.cost?.amount ?? s.mpCost?.value, 0);
 	const perTarget = !!s.cost?.perTarget || /x\s*t/i.test(String(s.cost?.amount ?? ''));
 	const rule = s.targeting?.rule;
-	const max = rule === 'multiple' ? Math.max(1, num(s.targeting?.max, 3)) : 1;
+	const max = rule === 'multiple' ? Math.max(1, num(s.targeting?.max) || 3) : 1;
 	const resource = s.resource ?? {};
 	if (resource.enabled && resource.type === 'hp') {
 		if (rule === 'self') return { kind: 'heal', name: item.name, heal: parseAmount(resource.amount, 30), mp: cost, targets: 1, selfOnly: true };
@@ -62,6 +63,7 @@ function spellAction(item) {
 		type: DTYPES.includes(dmg.type?.value) ? dmg.type.value : 'physical',
 		defense: s.defense === 'def' ? 'def' : 'mdef',
 		roll: s.hasRoll?.value !== false,
+		hr: dmg.hrZero ? false : undefined,
 		mp: cost,
 		targets: max,
 		perTarget,

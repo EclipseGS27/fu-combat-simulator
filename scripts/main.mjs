@@ -36,23 +36,6 @@ Hooks.on('renderCombatTracker', (tracker, html) => {
 	b.className = 'fucs-btn';
 	b.innerHTML = '<i class="fa-solid fa-chess-knight"></i> Simulate';
 	b.dataset.tooltip = 'Simulate this combat';
-	b.addEventListener('click', () => {
-		const a = open();
-		a.heroes = [];
-		a.foes = [];
-		a.result = null;
-		for (const cb of game.combat.combatants) {
-			const actor = cb.actor;
-			if (!actor) continue;
-			const friendly = actor.type === 'character' || (cb.token?.disposition ?? 0) === 1;
-			if (friendly) a.heroes.some((h) => h.uuid === actor.uuid) || a.heroes.push({ uuid: actor.uuid, name: actor.name, img: actor.img });
-			else {
-				const f = a.foes.find((x) => x.uuid === actor.uuid);
-				if (f) f.count++;
-				else a.foes.push({ uuid: actor.uuid, name: actor.name, img: actor.img, count: 1 });
-			}
-		}
-		a.render();
-	});
+	b.addEventListener('click', () => open()?.loadCombat(game.combat));
 	(el.querySelector('.combat-controls') ?? el.querySelector('footer') ?? el).append(b);
 });

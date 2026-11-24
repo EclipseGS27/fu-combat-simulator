@@ -75,8 +75,9 @@ function makeUnit(spec, side, idx) {
 		mp: spec.mpStart ?? spec.mpMax,
 		ip: spec.ipStart ?? spec.ipMax ?? 0,
 		guard: false,
-		out: false,
-		stats: { dealt: 0, taken: 0, healed: 0, mpSpent: 0, ipSpent: 0, kos: 0, turns: 0, crits: 0, misses: 0, attacks: 0, guards: 0, items: 0, spells: 0 },
+		// starting from current HP: a creature already at 0 is out of the fight
+		out: (spec.hpStart ?? spec.hpMax) <= 0,
+		stats: { dealt: 0, taken: 0, healed: 0, mpSpent: 0, ipSpent: 0, kos: 0, turns: 0, crits: 0, misses: 0, attacks: 0, swings: 0, guards: 0, items: 0, spells: 0 },
 	};
 }
 
@@ -141,7 +142,16 @@ function options(actor, ctx) {
 			.sort((a, b) => b.score - a.score);
 		if (!scored.length) continue;
 		const n = action.targets ?? 1;
-		const chosen = smart ? scored.slice(0, n) : [scored[Math.floor(ctx.rng() * scored.length)]].slice(0, n);
+		let chosen = scored.slice(0, n);
+		if (!smart) {
+			// random targets (a shuffled pick of n)
+			const pool = [...scored];
+			for (let k = pool.length - 1; k > 0; k--) {
+				const r = Math.floor(ctx.rng() * (k + 1));
+				[pool[k], pool[r]] = [pool[r], pool[k]];
+			}
+			chosen = pool.slice(0, n);
+		}
 		const totalCost = action.perTarget ? cost * chosen.length : cost;
 		if (totalCost > actor.mp) continue;
 		const value = chosen.reduce((s, c) => s + c.score, 0) - totalCost * ctx.mpValue(actor);
@@ -219,13 +229,15 @@ function act(actor, ctx) {
 	const d2 = roll(ctx.rng, dieOf(actor, action.attrs[1]));
 	const fumble = d1 === 1 && d2 === 1;
 	const crit = d1 === d2 && d1 >= 6;
-	const hr = Math.max(d1, d2);
+	// no-roll spells and "High Roll counts as 0" deal only their listed damage
+	const hr = action.roll === false || action.hr === false ? 0 : Math.max(d1, d2);
 	const total = d1 + d2 + (action.acc ?? 0);
 	actor.stats.attacks++;
 	if (crit) actor.stats.crits++;
 	const parts = [];
 	for (const t of targets) {
 		if (t.out) continue;
+		actor.stats.swings++;
 		const def = action.defense === 'mdef' ? t.mdef : t.def;
 		const hit = action.roll === false || (!fumble && (crit || total >= def));
 		if (!hit) {
@@ -237,7 +249,7 @@ function act(actor, ctx) {
 		ctx.know[actor.side].seen.set(`${t.key}|${action.type}`, aff);
 		let mult = AFF_MULT[aff] ?? 1;
 		if (t.guard) mult = guarded(mult);
-		const raw = (action.hr === false ? 0 : hr) + (action.damage ?? 0);
+		const raw = hr + (action.damage ?? 0);
 		if (mult < 0) {
 			const h = Math.min(raw, t.hpMax - t.hp);
 			t.hp += h;
@@ -255,7 +267,7 @@ function act(actor, ctx) {
 			parts.push(`${t.name} ${t.side === 'H' ? 'surrenders' : 'is defeated'}`);
 		}
 	}
-	log?.push(`${actor.name} ${action.mp ? 'casts' : 'uses'} ${action.name}${crit ? ' (critical!)' : fumble ? ' (fumble)' : ''} [${total}]: ${parts.join('; ') || 'no target'}.`);
+	log?.push(`${actor.name} ${action.mp ? 'casts' : 'uses'} ${action.name}${action.roll === false ? '' : `${crit ? ' (critical!)' : fumble ? ' (fumble)' : ''} [${total}]`}: ${parts.join('; ') || 'no target'}.`);
 }
 
 /* ---------- one battle ---------- */
@@ -337,7 +349,7 @@ export async function simulate(heroSpecs, foeSpecs, opts = {}, onProgress = null
 		timeouts: 0,
 		rounds: 0,
 		initiative: 0,
-		heroes: heroSpecs.map((s) => ({ name: s.name, img: s.img, ko: 0, hpLeft: 0, mpLeft: 0, dealt: 0, taken: 0, healed: 0, mpSpent: 0, ipSpent: 0, kos: 0, crits: 0, misses: 0, attacks: 0, guards: 0, items: 0, spells: 0 })),
+		heroes: heroSpecs.map((s) => ({ name: s.name, img: s.img, ko: 0, hpLeft: 0, mpLeft: 0, dealt: 0, taken: 0, healed: 0, mpSpent: 0, ipSpent: 0, kos: 0, crits: 0, misses: 0, attacks: 0, swings: 0, guards: 0, items: 0, spells: 0 })),
 		foes: foeSpecs.map((s) => ({ name: s.name, img: s.img, defeated: 0, dealt: 0, taken: 0, kos: 0, survived: 0 })),
 		roundsHist: {},
 		survivorsHist: {},
@@ -358,7 +370,7 @@ export async function simulate(heroSpecs, foeSpecs, opts = {}, onProgress = null
 			if (h.out) a.ko++;
 			a.hpLeft += h.hp / h.hpMax;
 			a.mpLeft += h.mpMax ? h.mp / h.mpMax : 1;
-			for (const k of ['dealt', 'taken', 'healed', 'mpSpent', 'ipSpent', 'kos', 'crits', 'misses', 'attacks', 'guards', 'items', 'spells']) a[k] += h.stats[k];
+			for (const k of ['dealt', 'taken', 'healed', 'mpSpent', 'ipSpent', 'kos', 'crits', 'misses', 'attacks', 'swings', 'guards', 'items', 'spells']) a[k] += h.stats[k];
 		});
 		res.foes.forEach((f, i) => {
 			const a = agg.foes[i];
@@ -415,7 +427,7 @@ function summarize(agg) {
 		notes,
 		roundsHist: agg.roundsHist,
 		survivorsHist: agg.survivorsHist,
-		heroes: agg.heroes.map((h) => ({ ...h, ko: h.ko / n, hpLeft: h.hpLeft / n, mpLeft: h.mpLeft / n, dealt: avg(h.dealt), taken: avg(h.taken), healed: avg(h.healed), mpSpent: avg(h.mpSpent), ipSpent: avg(h.ipSpent), kos: avg(h.kos), hitRate: h.attacks ? 1 - h.misses / Math.max(1, h.attacks) : 0, guards: avg(h.guards), items: avg(h.items), spells: avg(h.spells) })),
+		heroes: agg.heroes.map((h) => ({ ...h, ko: h.ko / n, hpLeft: h.hpLeft / n, mpLeft: h.mpLeft / n, dealt: avg(h.dealt), taken: avg(h.taken), healed: avg(h.healed), mpSpent: avg(h.mpSpent), ipSpent: avg(h.ipSpent), kos: avg(h.kos), hitRate: h.swings ? 1 - h.misses / h.swings : 0, guards: avg(h.guards), items: avg(h.items), spells: avg(h.spells) })),
 		foes: agg.foes.map((f) => ({ ...f, defeated: f.defeated / n, dealt: avg(f.dealt), taken: avg(f.taken), kos: avg(f.kos), share: f.dealt / foeDmg })),
 		sample: agg.sample,
 	};

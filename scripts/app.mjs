@@ -10,7 +10,8 @@ const f1 = (v) => (Math.round(v * 10) / 10).toLocaleString();
 
 function partyCharacters() {
 	try {
-		const p = game.actors.get(game.settings.get('projectfu', 'activeParty'));
+		const v = game.settings.get('projectfu', 'optionActiveParty');
+		const p = v instanceof Actor ? v : game.actors.get(v);
 		const list = (p?.system?.characters ?? []).map((u) => fromUuidSync(u)).filter(Boolean);
 		if (list.length) return list;
 	} catch {
@@ -34,7 +35,6 @@ export class SimulatorApp extends ApplicationV2 {
 			count: SimulatorApp.#count,
 			clear: SimulatorApp.#clear,
 			toggleLog: SimulatorApp.#toggleLog,
-			newSample: SimulatorApp.#run,
 		},
 	};
 
@@ -164,9 +164,12 @@ export class SimulatorApp extends ApplicationV2 {
 		this.render();
 	}
 
-	static #fromCombat() {
-		const c = game.combat;
+	/** Replace both sides with the combatants of a combat (characters and friendly tokens are heroes) */
+	loadCombat(c = game.combat) {
 		if (!c) return ui.notifications.info('No combat.');
+		this.heroes = [];
+		this.foes = [];
+		this.result = null;
 		for (const cb of c.combatants) {
 			const a = cb.actor;
 			if (!a) continue;
@@ -174,6 +177,10 @@ export class SimulatorApp extends ApplicationV2 {
 			this.#add(friendly ? 'heroes' : 'foes', a);
 		}
 		this.render();
+	}
+
+	static #fromCombat() {
+		this.loadCombat();
 	}
 
 	static #remove(e, t) {

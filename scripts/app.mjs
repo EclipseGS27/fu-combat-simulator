@@ -173,7 +173,7 @@ export class SimulatorApp extends ApplicationV2 {
 		this.result = null;
 		for (const cb of c.combatants) {
 			const a = cb.actor;
-			if (!a) continue;
+			if (!a || a.getFlag?.('fu-class-mechanics', 'vehicleOf')) continue;
 			const friendly = a.type === 'character' || (cb.token?.disposition ?? 0) === 1;
 			this.#add(friendly ? 'heroes' : 'foes', a);
 		}

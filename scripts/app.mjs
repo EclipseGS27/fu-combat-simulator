@@ -12,7 +12,8 @@ function partyCharacters() {
 	try {
 		const v = game.settings.get('projectfu', 'optionActiveParty');
 		const p = v instanceof Actor ? v : game.actors.get(v);
-		const list = (p?.system?.characters ?? []).map((u) => fromUuidSync(u)).filter(Boolean);
+		// Project FU keeps the party as a Set of uuids
+		const list = [...(p?.system?.characters ?? [])].map((u) => fromUuidSync(u)).filter(Boolean);
 		if (list.length) return list;
 	} catch {
 		/* no party */

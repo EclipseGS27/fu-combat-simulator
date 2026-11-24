@@ -53,14 +53,17 @@ function spellAction(item) {
 		return { kind: 'heal', name: item.name, heal: parseAmount(resource.amount, 30), mp: cost, targets: max, perTarget };
 	}
 	const dmg = s.rollInfo?.damage;
-	if (!dmg?.hasDamage?.value) return null;
+	// Project FU 4.x wraps these in { value }; 5.x stores them plainly
+	const plain = (v) => (v && typeof v === 'object' && 'value' in v ? v.value : v);
+	if (!plain(dmg?.hasDamage)) return null;
+	const dtype = plain(dmg.type);
 	return {
 		kind: 'attack',
 		name: item.name,
 		attrs: attrsOf(item, ['ins', 'wlp']),
 		acc: num(s.rollInfo?.accuracy?.value),
 		damage: num(dmg.value),
-		type: DTYPES.includes(dmg.type?.value) ? dmg.type.value : 'physical',
+		type: DTYPES.includes(dtype) ? dtype : 'physical',
 		defense: s.defense === 'def' ? 'def' : 'mdef',
 		roll: s.hasRoll?.value !== false,
 		hr: dmg.hrZero ? false : undefined,
@@ -93,7 +96,12 @@ export function specFrom(actor, { current = false } = {}) {
 			const a = weaponAction(w);
 			if (a) actions.push(a);
 		}
-		if (!actions.length) actions.push({ kind: 'attack', name: 'Unarmed strike', attrs: ['dex', 'mig'], acc: 0, damage: 0, type: 'physical', defense: 'def', targets: 1 });
+		// nothing equipped: the character's own Unarmed Strike item (Project FU adds one), else the rules' default
+		if (!actions.length) {
+			const unarmed = items.find((i) => i.type === 'weapon' && (i.system?.fuid === 'unarmed-strike' || /unarmed/i.test(i.name)));
+			const a = unarmed ? weaponAction(unarmed) : null;
+			actions.push(a ?? { kind: 'attack', name: 'Unarmed strike', attrs: ['dex', 'mig'], acc: 0, damage: 0, type: 'physical', defense: 'def', targets: 1 });
+		}
 	} else {
 		for (const b of items.filter((i) => i.type === 'basic')) {
 			const a = weaponAction(b);

@@ -1,0 +1,37 @@
+{
+  "id": "fu-combat-simulator",
+  "title": "Fabula Ultima Combat Simulator",
+  "description": "Test encounters before running them in Project FU: hundreds of simulated battles with the Fabula Ultima rules (initiative, alternating turns, elites and champions, checks, crits and fumbles, affinities, Guard, Remedies and Elixirs) and a smart tactical AI for heroes and monsters, with win rate, difficulty, KO rates, damage shares, notes and a sample battle log.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "George Sowidan"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "projectfu",
+        "type": "system",
+        "compatibility": {
+          "minimum": "4.14.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "styles": [
+    "styles/simulator.css"
+  ],
+  "socket": true,
+  "url": "https://github.com/EclipseGS27/fu-combat-simulator",
+  "manifest": "https://raw.githubusercontent.com/EclipseGS27/fu-combat-simulator/main/module.json",
+  "download": "https://github.com/EclipseGS27/fu-combat-simulator/releases/download/v0.1.0/fu-combat-simulator.zip",
+  "bugs": "https://github.com/EclipseGS27/fu-combat-simulator/issues"
+}
